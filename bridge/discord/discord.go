@@ -282,7 +282,7 @@ func (b *Bdiscord) Send(msg config.Message) (string, error) {
 	}
 
 	//Handle custom emoji
-	msg.Text = b.replaceEmotes(msg.Text)
+	msg.Text = b.translateEmotes(msg.Text)
 
 	threadID := ""
 	if msg.ParentValid() {
@@ -291,7 +291,7 @@ func (b *Bdiscord) Send(msg config.Message) (string, error) {
 			threadID = parentMessage.Thread.ID
 		} else {
 			b.Log.Debugf("Creating thread")
-			var thread, _ = b.c.MessageThreadStart(channelID, parentMessage.ID, parentMessage.Content, 60)
+			var thread, _ = b.c.MessageThreadStart(channelID, parentMessage.ID, replaceEmotes(parentMessage.Content), 60)
 			b.Log.Debugf("Created thread %s", thread.ID)
 			threadID = thread.ID
 		}
@@ -430,7 +430,7 @@ func (b *Bdiscord) handleUploadFile(msg *config.Message, channelID string) (stri
 }
 
 // translate discord emoji
-func (b *Bdiscord) replaceEmotes(text string) string {
+func (b *Bdiscord) translateEmotes(text string) string {
 	if matches := emojiRE.FindAllStringSubmatch(text, -1); len(matches) > 0 {
 		if emojis, err := b.c.GuildEmojis(b.guildID); err == nil {
 			for _, match := range matches {
