@@ -276,17 +276,30 @@ func (b *Bdiscord) Send(msg config.Message) (string, error) {
 		msg.ParentID = ""
 	}
 
-	// Use webhook to send the message
-	useWebhooks := b.shouldMessageUseWebhooks(&msg)
-	if useWebhooks && msg.Event != config.EventMsgDelete && msg.ParentID == "" {
-		return b.handleEventWebhook(&msg, channelID)
+	threadID := ""
+	if msg.ParentValid() {
+		if parentMessage, _ := b.c.ChannelMessage(channelID, msg.ParentID); parentMessage.Thread != nil {
+			b.Log.Debugf("Thread found: %s", parentMessage.Thread.ParentID)
+			threadID = parentMessage.Thread.ID
+		} else {
+			b.Log.Debugf("Creating thread")
+			var thread, _ = b.c.MessageThreadStart(channelID, parentMessage.ID, parentMessage.Content, 60)
+			b.Log.Debugf("Created thread %s", thread.ID)
+			threadID = thread.ID
+		}
 	}
 
-	return b.handleEventBotUser(&msg, channelID)
+	// Use webhook to send the message
+	useWebhooks := b.shouldMessageUseWebhooks(&msg)
+	if useWebhooks && msg.Event != config.EventMsgDelete {
+		return b.handleEventWebhook(&msg, channelID, threadID)
+	}
+
+	return b.handleEventBotUser(&msg, channelID, threadID)
 }
 
 // handleEventDirect handles events via the bot user
-func (b *Bdiscord) handleEventBotUser(msg *config.Message, channelID string) (string, error) {
+func (b *Bdiscord) handleEventBotUser(msg *config.Message, channelID string, threadID string) (string, error) {
 	b.Log.Debugf("Broadcasting using token (API)")
 
 	// Delete message
@@ -294,7 +307,19 @@ func (b *Bdiscord) handleEventBotUser(msg *config.Message, channelID string) (st
 		if msg.ID == "" {
 			return "", nil
 		}
-		err := b.c.ChannelMessageDelete(channelID, msg.ID)
+
+		channel := channelID
+		if threadID != "" {
+			channel = threadID
+		}
+
+		err := b.c.ChannelMessageDelete(channel, msg.ID)
+		if threadID != "" {
+			if thread, err := b.c.Channel(threadID); err == nil && thread.MessageCount == 0 {
+				b.c.ChannelDelete(threadID)
+			}
+		}
+
 		return "", err
 	}
 
@@ -355,14 +380,6 @@ func (b *Bdiscord) handleEventBotUser(msg *config.Message, channelID string) (st
 		m := discordgo.MessageSend{
 			Content:         msg.Username + msgPart,
 			AllowedMentions: b.getAllowedMentions(),
-		}
-
-		if msg.ParentValid() {
-			m.Reference = &discordgo.MessageReference{
-				MessageID: msg.ParentID,
-				ChannelID: channelID,
-				GuildID:   b.guildID,
-			}
 		}
 
 		// Post normal message

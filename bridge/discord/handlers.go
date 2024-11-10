@@ -14,6 +14,10 @@ func (b *Bdiscord) messageDelete(s *discordgo.Session, m *discordgo.MessageDelet
 	rmsg := config.Message{Account: b.Account, ID: m.ID, Event: config.EventMsgDelete, Text: config.EventMsgDelete}
 	rmsg.Channel = b.getChannelName(m.ChannelID)
 
+	if channel, _ := b.c.Channel(m.ChannelID); channel.Type == discordgo.ChannelTypeGuildPublicThread || channel.Type == discordgo.ChannelTypeGuildPrivateThread {
+		rmsg.Channel = b.getChannelName(channel.ParentID)
+	}
+
 	b.Log.Debugf("<= Sending message from %s to gateway", b.Account)
 	b.Log.Debugf("<= Message is %#v", rmsg)
 	b.Remote <- rmsg
@@ -32,6 +36,10 @@ func (b *Bdiscord) messageDeleteBulk(s *discordgo.Session, m *discordgo.MessageD
 			Event:   config.EventMsgDelete,
 			Text:    config.EventMsgDelete,
 			Channel: b.getChannelName(m.ChannelID),
+		}
+
+		if channel, _ := b.c.Channel(m.ChannelID); channel.Type == discordgo.ChannelTypeGuildPublicThread || channel.Type == discordgo.ChannelTypeGuildPrivateThread {
+			rmsg.Channel = b.getChannelName(channel.ParentID)
 		}
 
 		b.Log.Debugf("<= Sending message from %s to gateway", b.Account)
@@ -156,6 +164,16 @@ func (b *Bdiscord) messageCreate(s *discordgo.Session, m *discordgo.MessageCreat
 	// Add our parent id if it exists, and if it's not referring to a message in another channel
 	if ref := m.MessageReference; ref != nil && ref.ChannelID == m.ChannelID {
 		rmsg.ParentID = ref.MessageID
+	}
+
+	// Update references if we are in a thread
+	if channel, _ := b.c.Channel(m.ChannelID); channel.Type == discordgo.ChannelTypeGuildPublicThread || channel.Type == discordgo.ChannelTypeGuildPrivateThread {
+		rmsg.Channel = b.getChannelName(channel.ParentID)
+
+		if messages, _ := b.c.ChannelMessages(m.ChannelID, 1, "", "0", ""); len(messages) == 1 && messages[0].Type == discordgo.MessageTypeThreadStarterMessage {
+			message := messages[0]
+			rmsg.ParentID = message.MessageReference.MessageID
+		}
 	}
 
 	b.Log.Debugf("<= Sending message from %s on %s to gateway", m.Author.Username, b.Account)
