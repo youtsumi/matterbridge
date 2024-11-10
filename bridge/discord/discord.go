@@ -3,6 +3,7 @@ package bdiscord
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -17,6 +18,10 @@ import (
 const (
 	MessageLength = 1950
 	cFileUpload   = "file_upload"
+)
+
+var (
+	emojiRE = regexp.MustCompile(`:(\S+):`)
 )
 
 type Bdiscord struct {
@@ -276,6 +281,9 @@ func (b *Bdiscord) Send(msg config.Message) (string, error) {
 		msg.ParentID = ""
 	}
 
+	//Handle custom emoji
+	msg.Text = b.replaceEmotes(msg.Text)
+
 	threadID := ""
 	if msg.ParentValid() {
 		if parentMessage, _ := b.c.ChannelMessage(channelID, msg.ParentID); parentMessage.Thread != nil {
@@ -419,4 +427,40 @@ func (b *Bdiscord) handleUploadFile(msg *config.Message, channelID string) (stri
 	}
 
 	return "", nil
+}
+
+// translate discord emoji
+func (b *Bdiscord) replaceEmotes(text string) string {
+	if matches := emojiRE.FindAllStringSubmatch(text, -1); len(matches) > 0 {
+		if emojis, err := b.c.GuildEmojis(b.guildID); err == nil {
+			for _, match := range matches {
+				if emoji := findEmoji(emojis, match[1]); emoji != nil {
+					var emojiString strings.Builder
+
+					emojiString.WriteString("<")
+					if emoji.Animated {
+						emojiString.WriteString("a")
+					}
+
+					emojiString.WriteString(match[0])
+					emojiString.WriteString(emoji.ID)
+					emojiString.WriteString(">")
+
+					text = strings.ReplaceAll(text, match[0], emojiString.String())
+				}
+			}
+		}
+	}
+
+	return text
+}
+
+func findEmoji(emojis []*discordgo.Emoji, emojiName string) *discordgo.Emoji {
+	for _, emoji := range emojis {
+		if emoji.Name == emojiName {
+			return emoji
+		}
+	}
+
+	return nil
 }
