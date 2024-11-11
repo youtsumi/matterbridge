@@ -21,7 +21,7 @@ const (
 )
 
 var (
-	emojiRE = regexp.MustCompile(`:(\S+):`)
+	emojiRE = regexp.MustCompile(`:(\w+):`)
 )
 
 type Bdiscord struct {
