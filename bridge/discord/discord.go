@@ -286,7 +286,7 @@ func (b *Bdiscord) Send(msg config.Message) (string, error) {
 
 	threadID := ""
 	if msg.ParentValid() {
-		if parentMessage, _ := b.c.ChannelMessage(channelID, msg.ParentID); parentMessage.Thread != nil {
+		if parentMessage, _ := b.c.ChannelMessage(channelID, msg.ParentID); parentMessage != nil && parentMessage.Thread != nil {
 			b.Log.Debugf("Thread found: %s", parentMessage.Thread.ParentID)
 			threadID = parentMessage.Thread.ID
 		} else {
