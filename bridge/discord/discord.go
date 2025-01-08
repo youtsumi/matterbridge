@@ -431,10 +431,23 @@ func (b *Bdiscord) handleUploadFile(msg *config.Message, channelID string) (stri
 
 // translate discord emoji
 func (b *Bdiscord) translateEmotes(text string) string {
-	if matches := emojiRE.FindAllStringSubmatch(text, -1); len(matches) > 0 {
+	if matchesRE := emojiRE.FindAllStringSubmatch(text, -1); len(matchesRE) > 0 {
+		matches := []string{}
+		dedupeMap := make(map[string]struct{})
+
+		for _, match := range matchesRE {
+			emojiName := match[1]
+
+			if _, exists := dedupeMap[emojiName]; !exists {
+				dedupeMap[emojiName] = struct{}{}
+				matches = append(matches, emojiName)
+			}
+		}
+
 		if emojis, err := b.c.GuildEmojis(b.guildID); err == nil {
 			for _, match := range matches {
-				if emoji := findEmoji(emojis, match[1]); emoji != nil {
+				if emoji := findEmoji(emojis, match); emoji != nil {
+					var emojiName = ":" + emoji.Name + ":"
 					var emojiString strings.Builder
 
 					emojiString.WriteString("<")
@@ -442,11 +455,11 @@ func (b *Bdiscord) translateEmotes(text string) string {
 						emojiString.WriteString("a")
 					}
 
-					emojiString.WriteString(match[0])
+					emojiString.WriteString(emojiName)
 					emojiString.WriteString(emoji.ID)
 					emojiString.WriteString(">")
 
-					text = strings.ReplaceAll(text, match[0], emojiString.String())
+					text = strings.ReplaceAll(text, emojiName, emojiString.String())
 				}
 			}
 		}
