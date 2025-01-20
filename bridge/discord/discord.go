@@ -286,14 +286,16 @@ func (b *Bdiscord) Send(msg config.Message) (string, error) {
 
 	threadID := ""
 	if msg.ParentValid() {
-		if parentMessage, _ := b.c.ChannelMessage(channelID, msg.ParentID); parentMessage != nil && parentMessage.Thread != nil {
-			b.Log.Debugf("Thread found: %s", parentMessage.Thread.ParentID)
-			threadID = parentMessage.Thread.ID
-		} else {
-			b.Log.Debugf("Creating thread")
-			var thread, _ = b.c.MessageThreadStart(channelID, parentMessage.ID, replaceEmotes(parentMessage.Content), 60)
-			b.Log.Debugf("Created thread %s", thread.ID)
-			threadID = thread.ID
+		if parentMessage, _ := b.c.ChannelMessage(channelID, msg.ParentID); parentMessage != nil {
+			if parentMessage.Thread != nil {
+				b.Log.Debugf("Thread found: %s", parentMessage.Thread.ParentID)
+				threadID = parentMessage.Thread.ID
+			} else {
+				b.Log.Debugf("Creating thread")
+				var thread, _ = b.c.MessageThreadStart(channelID, parentMessage.ID, replaceEmotes(parentMessage.Content), 60)
+				b.Log.Debugf("Created thread %s", thread.ID)
+				threadID = thread.ID
+			}
 		}
 	}
 
