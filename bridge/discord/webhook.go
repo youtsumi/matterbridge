@@ -67,35 +67,52 @@ func (b *Bdiscord) webhookSendTextOnly(msg *config.Message, channelID string, th
 	return strings.Join(msgIds, ";"), nil
 }
 
-func (b *Bdiscord) webhookSendFilesOnly(msg *config.Message, channelID string, threadID string) error {
-	for _, f := range msg.Extra["file"] {
+func (b *Bdiscord) webhookSendFilesOnly(msg *config.Message, channelID string, threadID string) (string, error) {
+	var (
+		messageId string = ""
+		err       error
+		content   string
+	)
+
+	files := []*discordgo.File{}
+
+	for i, f := range msg.Extra["file"] {
+
 		fi := f.(config.FileInfo) //nolint:forcetypeassert
+		if i == 0 {
+			content = fi.Comment
+		}
 		file := discordgo.File{
 			Name:        fi.Name,
 			ContentType: "",
 			Reader:      bytes.NewReader(*fi.Data),
 		}
-		content := fi.Comment
 
-		// Cannot use the resulting ID for any edits anyway, so throw it away.
-		// This has to be re-enabled when we implement message deletion.
-		_, err := b.transmitter.Send(
+		files = append(files, &file)
+	}
+
+	if len(files) > 0 {
+		res, err := b.transmitter.Send(
 			channelID,
 			threadID,
 			&discordgo.WebhookParams{
 				Username:        msg.Username,
 				AvatarURL:       msg.Avatar,
-				Files:           []*discordgo.File{&file},
+				Files:           files,
 				Content:         content,
 				AllowedMentions: b.getAllowedMentions(),
 			},
 		)
 		if err != nil {
-			b.Log.Errorf("Could not send file %#v for message %#v: %s", file, msg, err)
-			return err
+			b.Log.Errorf("Could not send file %#v for message %#v: %s", files, msg, err)
+			return "", err
+		}
+		if res != nil {
+			messageId = res.ID
 		}
 	}
-	return nil
+
+	return messageId, err
 }
 
 // webhookSend send one or more message via webhook, taking care of file
@@ -117,10 +134,8 @@ func (b *Bdiscord) webhookSend(msg *config.Message, channelID string, threadID s
 	// We can't send empty messages.
 	if msg.Text != "" {
 		res, err = b.webhookSendTextOnly(msg, channelID, threadID)
-	}
-
-	if err == nil && msg.Extra != nil {
-		err = b.webhookSendFilesOnly(msg, channelID, threadID)
+	} else if msg.Extra != nil {
+		res, err = b.webhookSendFilesOnly(msg, channelID, threadID)
 	}
 
 	return res, err

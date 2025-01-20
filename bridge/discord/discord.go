@@ -291,8 +291,13 @@ func (b *Bdiscord) Send(msg config.Message) (string, error) {
 				b.Log.Debugf("Thread found: %s", parentMessage.Thread.ParentID)
 				threadID = parentMessage.Thread.ID
 			} else {
+				content := replaceEmotes(parentMessage.Content)
+				if content == "" {
+					content = "thread"
+				}
+
 				b.Log.Debugf("Creating thread")
-				var thread, _ = b.c.MessageThreadStart(channelID, parentMessage.ID, replaceEmotes(parentMessage.Content), 60)
+				var thread, _ = b.c.MessageThreadStart(channelID, parentMessage.ID, content, 60)
 				b.Log.Debugf("Created thread %s", thread.ID)
 				threadID = thread.ID
 			}
