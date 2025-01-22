@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/42wim/matterbridge/bridge"
 	"github.com/42wim/matterbridge/bridge/config"
@@ -239,6 +240,10 @@ func (b *Bdiscord) Connect() error {
 	if b.GetInt("debuglevel") == 1 {
 		b.c.AddHandler(b.messageEvent)
 	}
+
+	tz, _ := time.LoadLocation("Europe/Prague")
+	now := time.Now().In(tz)
+	b.c.UpdateCustomStatus("Last restarted: " + now.Format(time.ANSIC))
 
 	return nil
 }
