@@ -293,17 +293,20 @@ func (b *Bdiscord) Send(msg config.Message) (string, error) {
 	if msg.ParentValid() {
 		if parentMessage, _ := b.c.ChannelMessage(channelID, msg.ParentID); parentMessage != nil {
 			if parentMessage.Thread != nil {
-				b.Log.Debugf("Thread found: %s", parentMessage.Thread.ParentID)
+				b.Log.Infof("Thread found: %s", parentMessage.Thread.ParentID)
 				threadID = parentMessage.Thread.ID
 			} else {
 				content := replaceEmotes(parentMessage.Content)
 				if content == "" {
 					content = "thread"
 				}
+				if len(content) > 100 {
+					content = content[:100]
+				}
 
-				b.Log.Debugf("Creating thread")
-				var thread, _ = b.c.MessageThreadStart(channelID, parentMessage.ID, content, 60)
-				b.Log.Debugf("Created thread %s", thread.ID)
+				b.Log.Infof("Creating thread")
+				var thread, err = b.c.MessageThreadStart(channelID, parentMessage.ID, content, 60)
+				b.Log.Infof("Created thread %s %s", thread.ID, err)
 				threadID = thread.ID
 			}
 		}
