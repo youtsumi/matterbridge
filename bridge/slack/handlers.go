@@ -511,7 +511,6 @@ func (b *Bslack) handleDownloadFile(rmsg *config.Message, file *slack.File, retr
 	// and should be added as comment to only one of the files. We reset the 'Text' field to ensure
 	// that the comment is not duplicated.
 	comment := rmsg.Text
-	rmsg.Text = ""
 	helper.HandleDownloadData2(b.Log, rmsg, file.Name, file.ID, comment, file.URLPrivateDownload, data, b.General)
 	return nil
 }
