@@ -13,6 +13,7 @@ import (
 	"github.com/42wim/matterbridge/matterhook"
 	"github.com/matterbridge/matterclient"
 	"github.com/rs/xid"
+	"github.com/mattermost/mattermost-server/v6/model"
 )
 
 type Bmattermost struct {
@@ -121,6 +122,21 @@ func (b *Bmattermost) JoinChannel(channel config.ChannelInfo) error {
 }
 
 func (b *Bmattermost) Send(msg config.Message) (string, error) {
+       if msg.Event == config.EventMessageEdit && b.GetBool("EditMessages") {
+               b.Log.Debugf("Editing message ID %s in channel %s", msg.ID, msg.Channel)
+
+               post := &model.Post{
+                       Id:      msg.ID,
+                       Message: msg.Text,
+               }
+
+               if _, resp := b.mmClient.UpdatePost(post); resp.Error != nil {
+                       return "", fmt.Errorf("UpdatePost failed: %s", resp.Error.Message)
+               }
+
+               return msg.ID, nil
+       }
+
 	if b.Account == mattermostPlugin {
 		return "", nil
 	}

@@ -35,7 +35,7 @@ func (b *Bslack) handleSlack() {
 	for message := range messages {
 		// don't do any action on deleted/typing messages
 		if message.Event != config.EventUserTyping && message.Event != config.EventMsgDelete &&
-			message.Event != config.EventFileDelete {
+		message.Event != config.EventFileDelete {
 			b.Log.Debugf("<= Sending message from %s on %s to gateway", message.Username, b.Account)
 			// cleanup the message
 			message.Text = b.replaceMention(message.Text)
@@ -131,12 +131,12 @@ func (b *Bslack) handleSlackClientSocketMode(messages chan *config.Message) {
 				case *slackevents.UserProfileChangedEvent:
 					b.users.invalidateUser(ev.User.ID)
 
-				// TODO not implemented
-				// case *slack.ChannelJoinedEvent:
-				// 	// When we join a channel we update the full list of users as
-				// 	// well as the information for the channel that we joined as this
-				// 	// should now tell that we are a member of it.
-				// 	b.channels.registerChannel(ev.Channel)
+					// TODO not implemented
+					// case *slack.ChannelJoinedEvent:
+					// 	// When we join a channel we update the full list of users as
+					// 	// well as the information for the channel that we joined as this
+					// 	// should now tell that we are a member of it.
+					// 	b.channels.registerChannel(ev.Channel)
 
 				case *slackevents.AppMentionEvent:
 				default:
@@ -287,7 +287,7 @@ func (b *Bslack) skipMessageEvent(ev *slack.MessageEvent) bool {
 		// It seems ev.SubMessage.Edited == nil when slack unfurls.
 		// Do not forward these messages. See Github issue #266.
 		if ev.SubMessage.ThreadTimestamp != ev.SubMessage.Timestamp &&
-			ev.SubMessage.Edited == nil {
+		ev.SubMessage.Edited == nil {
 			return true
 		}
 		// see hidden subtypes at https://api.slack.com/events/message
@@ -309,7 +309,7 @@ func (b *Bslack) skipMessageEvent(ev *slack.MessageEvent) bool {
 
 	// Skip any messages that we made ourselves or from 'slackbot' (see #527).
 	if ev.Username == sSlackBotUser ||
-		(b.rtm != nil && ev.Username == b.si.User.Name) || hasOurCallbackID {
+	(b.rtm != nil && ev.Username == b.si.User.Name) || hasOurCallbackID {
 		return true
 	}
 
@@ -345,6 +345,24 @@ func (b *Bslack) filesCached(files []slack.File) bool {
 //  6. Check that the Matterbridge message that we end up with after at the end of the
 //     pipeline is valid before sending it to the Matterbridge router.
 func (b *Bslack) handleMessageEvent(ev *slack.MessageEvent) (*config.Message, error) {
+       if ev.SubType == "message_changed" && ev.SubMessage != nil {
+               edited := &config.Message{
+                       Text:     ev.SubMessage.Text,
+                       Username: ev.SubMessage.Username,
+                       ID:       ev.SubMessage.Timestamp,
+                       Channel:  ev.Channel,
+                       Account:  b.Account,
+                       Event:    config.EventMessageEdit,
+               }
+
+               if len(ev.SubMessage.Files) > 0 {
+                       edited.Text += "\n" + ev.SubMessage.Files[0].URLPrivateDownload
+               }
+
+               b.Log.Debugf("Slack: edited message mapped to: %#v", edited)
+               return edited, nil
+       }
+
 	rmsg, err := b.populateReceivedMessage(ev)
 	if err != nil {
 		return nil, err
